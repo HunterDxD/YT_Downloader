@@ -1,6 +1,7 @@
 import sys
+import os
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton, QFileDialog, QMessageBox
-from pytube import YouTube
+import yt_dlp
 
 class YTDownloader(QWidget):
     def __init__(self):
@@ -27,17 +28,39 @@ class YTDownloader(QWidget):
             QMessageBox.warning(self, 'Fehler', 'Bitte gib einen YouTube-Link ein.')
             return
         try:
-            yt = YouTube(url)
-            stream = yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc().first()
-            if not stream:
-                QMessageBox.warning(self, 'Fehler', 'Kein passender Stream gefunden.')
+            save_path, _ = QFileDialog.getSaveFileName(self, 'Video speichern', 'video.mp4', 'MP4 Files (*.mp4)')
+            if not save_path:
                 return
-            save_path, _ = QFileDialog.getSaveFileName(self, 'Video speichern', f"{yt.title}.mp4", 'MP4 Files (*.mp4)')
-            if save_path:
-                stream.download(output_path=None, filename=save_path)
-                QMessageBox.information(self, 'Erfolg', 'Download abgeschlossen!')
+
+            # Pfad zur ffmpeg.exe bestimmen (funktioniert auch als EXE)
+            if getattr(sys, 'frozen', False):
+                # Wenn als EXE gebündelt
+                ffmpeg_path = os.path.join(sys._MEIPASS, 'ffmpeg.exe')
+                if not os.path.exists(ffmpeg_path):
+                    # Falls ffmpeg.exe im selben Ordner wie die EXE liegt
+                    ffmpeg_path = os.path.join(os.path.dirname(sys.executable), 'ffmpeg.exe')
+            else:
+                # Im Entwicklermodus (Python-Skript)
+                ffmpeg_path = os.path.abspath('ffmpeg.exe')
+
+            ydl_opts = {
+                'outtmpl': save_path,
+                'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+                'merge_output_format': 'mp4',
+                'quiet': True,
+                'noplaylist': True,
+                'progress_hooks': [self.yt_hook],
+                'ffmpeg_location': ffmpeg_path
+            }
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([url])
+            QMessageBox.information(self, 'Erfolg', 'Download abgeschlossen!')
         except Exception as e:
             QMessageBox.critical(self, 'Fehler', f'Fehler beim Download: {e}')
+
+    def yt_hook(self, d):
+        if d['status'] == 'error':
+            QMessageBox.critical(self, 'Fehler', 'Fehler beim Download.')
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
