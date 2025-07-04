@@ -24,7 +24,7 @@ jobs:
 
       - name: Build EXE with PyInstaller
         run: |
-          pyinstaller --onedir --clean --windowed yt_downloader.py
+          pyinstaller --add-binary "ffmpeg.exe;." --onedir --clean --windowed yt_downloader.py
 
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
